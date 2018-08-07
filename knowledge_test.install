@@ -1,0 +1,25 @@
+<?php
+
+/* 
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+function knowledge_test_schema() {
+  $schema['kennisstructuur'] = array(
+    'description' => 'Table with document subjects.',
+    'fields' => array(
+      'node_id' => array(
+        'description' => 'Node id of the main document.',
+        'type' => 'int',
+        'not null' => TRUE),
+      'nameslist' => array(
+        'description' => 'List of subjects',
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE),
+     )
+  );
+
+  return $schema;
+}

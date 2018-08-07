@@ -1,0 +1,183 @@
+<?php
+
+function knowledge_test_node_insert($node){
+    if(array_key_exists('field_document_status', $node)){
+        $knowledge_test_ckeditorPlugin = new knowledge_test_ckeditorPlugin();
+        $node = $knowledge_test_ckeditorPlugin->executePluginAction($node);
+    }
+}
+
+function knowledge_test_node_presave($node){
+
+    if(array_key_exists('nid', $node) && $node->nid >0){
+        $knowledge_test_ckeditorPlugin = new knowledge_test_ckeditorPlugin();
+        $node = $knowledge_test_ckeditorPlugin->executePluginAction($node);
+    }
+}
+
+function knowledge_test_node_view($node, $view_mode, $langcode) {
+    if($node->type == "organisation"){organisationTabelCheck($node->nid);}
+
+    if(array_key_exists("namerequest", $_POST)){
+        require_once 'knowledge_test.php';
+        jsRequest();
+    }
+}
+
+function knowledge_test_page_alter(&$page) {
+    if(array_key_exists("namerequest", $_POST)){
+        if(is_array($page)){
+            $page='';
+        }else{
+            die($page);
+        }
+    }
+}
+
+function knowledge_test_node_view_alter(&$build){
+   if($build["#node"]->type == "organisation"){organisationTabelCheck($build["#node"]->nid);} 
+}
+
+
+function organisationTabelCheck($nodenid){
+    if(!db_table_exists($nodenid)){
+          $table = array(
+            'description' => 'Test organisation document',
+            'fields' => array(
+              'nid'     => array('type' => 'int', 'not null' => TRUE),
+              'subject' => array('type' => 'varchar', 'length' => 256, 'not null' => TRUE, 'default' => ''),
+              'body'    => array('type' => 'text', 'size'=>'big', 'not null' => FALSE)
+            ),
+          );
+          db_create_table($nodenid, $table);
+          drupal_set_message("Tabel ".$nodenid." is aangemaakt.");
+    }
+}
+
+function knowledge_test_node_delete($node) {
+    if($node->type == "organisation"){
+        $nid = $node->nid;
+        if(db_table_exists($nid)){
+            db_drop_table($nid);
+        }
+    }
+}
+function get_hoofdgroep_data($requestlist){
+    $query = db_select('field_data_field_hoofdgroep', 'n') ;            
+    $query->addField('n', 'field_hoofdgroep_target_id','main_id');
+    $query->addField('m', 'title','main_title');
+    $query->addField('n', 'entity_id','sub_id');
+    $query->addField('ms', 'title','sub_title');
+    $query->join('node', 'm', 'n.field_hoofdgroep_target_id = m.nid');
+    $query->join('node', 'ms', 'n.entity_id = ms.nid');
+    $result = $query->execute();
+    $node_list =  $result->fetchAll();
+    $menu_list = array();
+    $titleList = array();
+    foreach ($node_list as $keyrow => $valuelist) {
+          $menu_list[$valuelist->main_id][$valuelist->sub_id] = $valuelist;
+          $sub_list[$valuelist->sub_id][$valuelist->main_id] = $valuelist;
+          $titleList[$valuelist->main_id] =$valuelist->main_title;
+          $titleList[$valuelist->sub_id] =$valuelist->sub_title;
+    }
+    $result = main_menu_knowledgeItems($menu_list, $sub_list);
+    return build_HTML_hoofdgroep($result, $menu_list, $titleList, $requestlist);
+}
+function main_menu_knowledgeItems(&$menu_list, &$sub_list){
+    foreach ($menu_list as $mainkey => $mainvalue) {
+        if(!array_key_exists($mainkey, $sub_list)){
+            foreach ($mainvalue as $rowKey =>$rowvalue){
+                $temp[][$mainkey][$rowKey] = $rowvalue;
+            }
+        }
+    }
+    $result=array();
+    $remove_item=array();
+    foreach ($temp as $row=>$content){
+        foreach ($content as $keyrow => $mainvalue) {
+            $sub_id = key($mainvalue);
+            $main_id = $keyrow;
+            addChildren($menu_list,$sub_id, $result, $main_id);
+        }
+    }
+    return $result;			
+}
+
+function addChildren(&$menu_list,$sub_id, &$result, $main_id){
+    $result[][$main_id]=$sub_id;
+    if(array_key_exists($sub_id, $menu_list)){
+        foreach ($menu_list[$sub_id] as $subkey => $subvalue) {
+            $countrows = count($result);
+            if($countrows > 600){break;}
+            addChildren($menu_list,$subkey, $result, $sub_id);
+        }
+    }
+}
+function build_HTML_hoofdgroep(&$result, &$menu_list, &$titleList, $requestlist){
+    $content = '<ul>';
+    $menuBlock = array();
+    $menuBlockCounter= 0;
+    $last_main_id = 0 ;
+    $last_sub_id = 0;
+    foreach ($result as $rowkey => $contentvalue) {
+        foreach ($contentvalue as $main_key => $sub_key) {
+            if($last_main_id != $main_key){
+                if($last_sub_id == $main_key){
+                    $maxrows = count($menuBlock)+1;
+                    $menuBlock[$maxrows]=$main_key;
+                    $content .= '<ul>';
+                    build_link_item($requestlist,$content, $sub_key, $titleList[$sub_key]);
+                }else{
+                    $reducemenuBlock = 'Yes';
+                    $menuBlockCounter = count($menuBlock);
+                    $menuBlockMainKey = end($menuBlock);
+                    if($menuBlockCounter >0){
+                        while($reducemenuBlock == 'Yes'){
+                            $menuBlockMainKey = end($menuBlock);
+                            if($menuBlockMainKey != $main_key){
+                                $content .= '</ul>';
+                                unset( $menuBlock[$menuBlockCounter]);
+                                $menuBlockCounter = count($menuBlock);
+                            }
+                            if($menuBlockMainKey == $main_key){$reducemenuBlock = 'No';$content .= '</ul>';}
+                            if($menuBlockCounter < 1){ $reducemenuBlock = 'No';}
+                        }
+                        
+                    }
+
+                    if($menuBlockMainKey != $main_key){
+                        build_link_item($requestlist,$content, $main_key, $titleList[$main_key]);
+                    }
+                    if(!array_search ($main_key , $menuBlock )){
+                        $maxrows = count($menuBlock)+1;
+                        $menuBlock[$maxrows]=$main_key;
+                    }
+                    $content .= '<ul>';
+                    build_link_item($requestlist,$content, $sub_key, $titleList[$sub_key]);
+                }
+            }elseif ($last_sub_id != $main_key) {
+                build_link_item($requestlist,$content, $sub_key, $titleList[$sub_key]);
+            }    
+
+            $last_main_id = $main_key ;
+            $last_sub_id = $sub_key;
+        }
+    }
+    $menuBlockCounter = count($menuBlock);
+    while($menuBlockCounter >0){
+            $content .= '</ul>';
+            unset( $menuBlock[$menuBlockCounter]);
+            $menuBlockCounter = count($menuBlock);
+    }
+    $content .= '</ul>';
+    return $content;
+}
+
+function build_link_item($requestlist,&$content, $nid, $title){
+    if($requestlist == 'knowledgemenu'){
+        $content .= '<li class="onclickreplace" nid="'.$nid.'" onclick="getInfo('.$title.')">'.$title.'</li>';
+    }
+    if($requestlist == 'maingroupmenu'){
+        $content .= '<li nid="'.$nid.'" ><a href="/node/'.$nid.'" target="_blank">'.$title.'</a></li>';
+    }
+}

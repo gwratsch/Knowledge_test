@@ -1,0 +1,17 @@
+name = knowledge_test module
+description = knowledge_test  module
+package = knowledge_test module
+core = 7.x
+dependencies[] = ckeditor_plugin
+dependencies[] = ckeditor
+dependencies[] = entityreference
+
+scripts[] = knowledge_test.js
+files[] = knowledge_test.php
+files[] = knowledge_test.module
+files[] = knowledge_test_ckeditorPlugin.class.php
+files[] = knowledge_test.install
+
+
+; Always available CSS
+stylesheets[all][] = knowledge_test.css

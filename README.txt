@@ -1,5 +1,3 @@
-# Knowledge_test
-
 Knowledge Test module
 Drupal 7 module.
 
